@@ -2,9 +2,14 @@
 Decay label generation from IC time series.
 
 Three label flavors:
-    L1: half-life (months until rolling IC drops below 0.5 * initial IC)
+    L1: half-life  — months until rolling IC sign-flips and persists
     L2: binary survival at horizon N
     L3: continuous IC slope (linear regression)
+
+Decay definition (L1):
+    A factor is declared "decayed" when its `persist_months`-rolling mean IC
+    crosses zero (relative to the sign of IC_0) and stays there.
+    This is more robust than a relative threshold (50% of IC_0) for near-zero IC.
 """
 
 from __future__ import annotations
@@ -16,41 +21,58 @@ import pandas as pd
 def compute_half_life_label(
     ic_series: pd.Series,
     initial_window_months: int = 6,
-    threshold_ratio: float = 0.5,
     persist_months: int = 3,
+    min_abs_ic0: float = 0.005,
 ) -> tuple[float, int]:
     """
-    Compute half-life of an IC series.
+    Compute IC half-life via sign-flip criterion.
+
+    A factor is "decayed" when its rolling `persist_months`-mean IC crosses
+    zero (sign is opposite to IC_0) for the first time.
+
+    Parameters
+    ----------
+    ic_series : pd.Series
+        Monthly IC values in chronological order.
+    initial_window_months : int
+        Months used to estimate IC_0 (the initial IC level).
+    persist_months : int
+        Rolling window length; decay requires the rolling mean to flip sign.
+    min_abs_ic0 : float
+        If |IC_0| < min_abs_ic0 the factor is considered noise and
+        treated as right-censored (event = 0).
 
     Returns
     -------
     duration : float
-        Number of months from t0 to confirmed decay event.
-        For right-censored cases, equals the full observation length.
+        Months from start to first confirmed decay. Equals series length
+        for right-censored cases.
     event : int
-        1 if decay was observed (IC dropped below threshold for `persist_months`),
-        0 if right-censored.
+        1 = decay observed, 0 = right-censored.
     """
     s = ic_series.dropna()
-    if len(s) < initial_window_months + persist_months:
-        return float(len(s)), 0
+    n = len(s)
+    min_len = initial_window_months + persist_months
+    if n < min_len:
+        return float(n), 0
 
     ic_0 = s.iloc[:initial_window_months].mean()
-    if abs(ic_0) < 1e-6:
-        return float(len(s)), 0
 
-    threshold = threshold_ratio * ic_0
+    # Treat near-zero initial IC as noise → censored
+    if abs(ic_0) < min_abs_ic0:
+        return float(n), 0
+
     rolling = s.rolling(window=persist_months, min_periods=persist_months).mean()
 
-    # Sign-aware: if ic_0 > 0, decay = rolling falls below threshold.
+    # Decay = rolling IC crosses zero (in the opposite direction to ic_0)
     if ic_0 > 0:
-        decayed = rolling < threshold
+        decayed = rolling < 0   # positive factor turns negative
     else:
-        decayed = rolling > threshold
+        decayed = rolling > 0   # negative factor turns positive (also decay)
 
     decayed_idx = np.where(decayed.values)[0]
     if len(decayed_idx) == 0:
-        return float(len(s)), 0
+        return float(n), 0
 
     return float(decayed_idx[0]), 1
 
@@ -58,17 +80,11 @@ def compute_half_life_label(
 def compute_binary_label(
     ic_series: pd.Series,
     horizon_months: int = 24,
-    initial_window_months: int = 6,
-    threshold_ratio: float = 0.5,
-    persist_months: int = 3,
+    **kwargs,
 ) -> int:
     """Did the factor decay within `horizon_months`? (1 = decayed, 0 = survived)"""
-    duration, event = compute_half_life_label(
-        ic_series, initial_window_months, threshold_ratio, persist_months
-    )
-    if event == 1 and duration <= horizon_months:
-        return 1
-    return 0
+    duration, event = compute_half_life_label(ic_series, **kwargs)
+    return int(event == 1 and duration <= horizon_months)
 
 
 def compute_decay_slope_label(ic_series: pd.Series) -> float:
@@ -81,10 +97,12 @@ def compute_decay_slope_label(ic_series: pd.Series) -> float:
     return float(slope)
 
 
-def generate_labels_for_panel(ic_panel: pd.DataFrame, **kwargs) -> pd.DataFrame:
+def generate_labels_for_panel(ic_panel: pd.DataFrame) -> pd.DataFrame:
     """
-    Generate all three labels for each factor.
+    Generate all three labels for each factor in the panel.
 
+    Parameters
+    ----------
     ic_panel : DataFrame with columns [factor_id, date, ic]
     """
     rows = []

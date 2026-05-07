@@ -86,7 +86,7 @@ def compute_ic_series(
         df = (
             df.set_index("date")
               .groupby("factor_id")
-              .resample("M")["ic"].mean()
+              .resample("ME")["ic"].mean()
               .reset_index()
         )
     return df

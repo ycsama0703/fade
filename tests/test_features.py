@@ -46,8 +46,8 @@ def test_half_life_no_decay_is_censored():
 
 
 def test_half_life_clear_decay_is_observed():
-    # Drop from 0.05 to 0.01 after month 6 — should detect decay
-    ic = [0.05] * 6 + [0.01] * 18
+    # Factor starts positive (IC=0.05) then flips negative (-0.05) — clear decay
+    ic = [0.05] * 6 + [-0.05] * 18
     s = pd.Series(ic)
     duration, event = compute_half_life_label(s)
     assert event == 1

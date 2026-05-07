@@ -10,7 +10,7 @@ data:
 
 factor_pool:
   use_alpha158: true
-  use_synthetic: true
+  use_synthetic: false
   use_academic: false
 
   synthetic:
@@ -34,9 +34,9 @@ backtest:
 labels:
   half_life:
     initial_window_months: 6
-    threshold_ratio: 0.5
-    persist_months: 3
-  binary_horizons: [12, 24, 36]
+    persist_months: 6       # rolling months IC must maintain sign-flip to confirm decay
+    min_abs_ic0: 0.005      # factors with |IC_0| below this are treated as noise
+  binary_horizons: [24, 36]
 
 features:
   early_ic_windows: [3, 6, 12]
