@@ -48,13 +48,20 @@ def extract_early_ic_features(ic_series: pd.Series, K: int = 6) -> dict:
 def extract_early_ic_features_batch(
     ic_panel: pd.DataFrame,
     K_values: list[int] = (3, 6, 12),
+    discovery_dates: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """
     ic_panel : DataFrame with columns [factor_id, date, ic]
+    discovery_dates : optional {factor_id: "YYYY-MM-DD"} — IC is sliced from
+        this date so that K-month windows are measured post-discovery.
     """
     rows = []
     for fid, group in ic_panel.groupby("factor_id"):
-        s = group.sort_values("date")["ic"]
+        grp = group.sort_values("date")
+        if discovery_dates and fid in discovery_dates:
+            disc = pd.Timestamp(discovery_dates[fid])
+            grp = grp[grp["date"] >= disc]
+        s = grp["ic"]
         feats: dict = {"factor_id": fid}
         for K in K_values:
             feats.update(extract_early_ic_features(s, K=K))

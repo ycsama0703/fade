@@ -211,11 +211,15 @@ def main(config_path: str):
     print(f"  Group A shape: {feat_A.shape}")
 
     # ------------------------------------------------------------------
-    # Group B: early IC dynamics
+    # Group B: early IC dynamics (sliced from discovery date)
     # ------------------------------------------------------------------
     print("Extracting Group B: early IC dynamics (K = 3, 6, 12) ...")
+    disc_dates = dict(zip(registry_df["factor_id"], registry_df["discovery_date"])) \
+        if "discovery_date" in registry_df.columns else None
     feat_B = extract_early_ic_features_batch(
-        ic_panel, K_values=cfg["features"]["early_ic_windows"]
+        ic_panel,
+        K_values=cfg["features"]["early_ic_windows"],
+        discovery_dates=disc_dates,
     )
     print(f"  Group B shape: {feat_B.shape}")
 
@@ -239,7 +243,7 @@ def main(config_path: str):
     for _, row in tqdm(registry_df.iterrows(), total=len(registry_df),
                        desc="  Market env"):
         fid = row["factor_id"]
-        disc_date = cfg["data"]["start_date"]   # Alpha158: uniform discovery
+        disc_date = row.get("discovery_date", cfg["data"]["start_date"])
         factor_ic = (
             ic_panel[ic_panel["factor_id"] == fid]
             .sort_values("date")

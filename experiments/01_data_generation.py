@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import pickle
+import random
 import sys
 from pathlib import Path
 
@@ -76,6 +77,28 @@ def build_factor_pool(cfg: dict) -> tuple[dict[str, str], dict[str, str]]:
         )
     print(f"[pool] Total: {len(exprs)} factors.")
     return exprs, registry
+
+
+def assign_discovery_dates(
+    registry: dict[str, str],
+    cfg: dict,
+    seed: int = 42,
+) -> dict[str, str]:
+    """Assign a random discovery date to each synthetic factor."""
+    rng = random.Random(seed)
+    syn_cfg = cfg["factor_pool"]["synthetic"]
+    d_start = pd.Timestamp(syn_cfg.get("discovery_date_start", cfg["data"]["start_date"]))
+    d_end   = pd.Timestamp(syn_cfg.get("discovery_date_end",   cfg["data"]["end_date"]))
+    span_days = (d_end - d_start).days
+
+    dates: dict[str, str] = {}
+    for fid, source in registry.items():
+        if source == "alpha158":
+            dates[fid] = cfg["data"]["start_date"]
+        else:
+            offset = rng.randint(0, span_days)
+            dates[fid] = (d_start + pd.Timedelta(days=offset)).strftime("%Y-%m-%d")
+    return dates
 
 
 def compute_ic_in_batches(
@@ -163,8 +186,10 @@ def main(config_path: str):
     ic_panel.to_parquet(data_dir / "ic_series_filtered.parquet", index=False)
     print(f"[save] ic_series_filtered.parquet  {ic_panel.shape}")
 
+    disc_dates = assign_discovery_dates(registry, cfg, seed=cfg["seed"])
     registry_df = pd.DataFrame([
-        {"factor_id": fid, "source": src, "expression": exprs[fid]}
+        {"factor_id": fid, "source": src,
+         "expression": exprs[fid], "discovery_date": disc_dates[fid]}
         for fid, src in registry.items()
     ])
     registry_df.to_csv(data_dir / "factor_registry.csv", index=False)
@@ -174,9 +199,9 @@ def main(config_path: str):
     with open(data_dir / "factor_expressions_filtered.pkl", "wb") as f:
         pickle.dump({fid: None for fid in registry}, f)
 
-    # 5. Generate labels
+    # 5. Generate labels (slice IC from discovery date for each factor)
     print("\n[labels] Computing decay labels...")
-    labels = generate_labels_for_panel(ic_panel)
+    labels = generate_labels_for_panel(ic_panel, discovery_dates=disc_dates)
     labels.to_parquet(data_dir / "labels.parquet")
     print(f"[save] labels.parquet  {labels.shape}")
 

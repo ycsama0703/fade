@@ -9,18 +9,20 @@ data:
   qlib_provider_uri: "~/.qlib/qlib_data/cn_data"
 
 factor_pool:
-  use_alpha158: true
-  use_synthetic: false
+  use_alpha158: false
+  use_synthetic: true
   use_academic: false
 
   synthetic:
-    n_candidates: 5000
+    n_candidates: 1000
     max_tree_depth: 4
-    operators_ts: [ts_mean, ts_std, ts_max, ts_min, ts_rank, ts_corr, delta]
-    operators_cs: [rank, zscore, scale]
+    operators_ts: [ts_mean, ts_std, ts_max, ts_min, ts_rank, delta]
+    operators_cs: []
     operators_arith: [add, sub, mul, div, log, abs]
     lookback_windows: [5, 10, 20, 60]
     base_fields: [open, high, low, close, volume, vwap]
+    discovery_date_start: "2010-06-01"
+    discovery_date_end: "2018-12-31"
 
   filter:
     min_initial_abs_ic: 0.01
@@ -54,7 +56,7 @@ split:
 
 models:
   cox:
-    penalizer: 0.01
+    penalizer: 0.10
     l1_ratio: 0.0
   xgboost:
     n_estimators: 500

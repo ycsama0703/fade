@@ -22,13 +22,13 @@ class XGBoostRegressor:
             learning_rate=learning_rate,
             subsample=subsample,
             random_state=random_state,
-            tree_method="hist",
+            tree_method="exact",
         )
         self.feature_columns_: list[str] = []
 
     def fit(self, X: pd.DataFrame, y: pd.Series, event: pd.Series | None = None):
         # Without survival framework, drop censored samples or treat them as observed.
-        df = pd.get_dummies(X.copy(), drop_first=True)
+        df = pd.get_dummies(X.copy(), drop_first=True).astype(float)
         if event is not None:
             mask = event == 1
             df = df[mask.values]
@@ -38,7 +38,7 @@ class XGBoostRegressor:
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
-        df = pd.get_dummies(X.copy(), drop_first=True)
+        df = pd.get_dummies(X.copy(), drop_first=True).astype(float)
         df = df.reindex(columns=self.feature_columns_, fill_value=0)
         return self.model.predict(df)
 

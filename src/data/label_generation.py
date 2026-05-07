@@ -97,17 +97,27 @@ def compute_decay_slope_label(ic_series: pd.Series) -> float:
     return float(slope)
 
 
-def generate_labels_for_panel(ic_panel: pd.DataFrame) -> pd.DataFrame:
+def generate_labels_for_panel(
+    ic_panel: pd.DataFrame,
+    discovery_dates: dict[str, str] | None = None,
+) -> pd.DataFrame:
     """
     Generate all three labels for each factor in the panel.
 
     Parameters
     ----------
     ic_panel : DataFrame with columns [factor_id, date, ic]
+    discovery_dates : optional dict {factor_id: "YYYY-MM-DD"}
+        If provided, IC series is sliced to start from the discovery date,
+        so features and labels are computed in-sample from that point.
     """
     rows = []
     for fid, group in ic_panel.groupby("factor_id"):
-        ic = group.sort_values("date")["ic"]
+        grp = group.sort_values("date")
+        if discovery_dates and fid in discovery_dates:
+            disc = pd.Timestamp(discovery_dates[fid])
+            grp = grp[grp["date"] >= disc]
+        ic = grp["ic"]
         duration, event = compute_half_life_label(ic)
         rows.append({
             "factor_id": fid,

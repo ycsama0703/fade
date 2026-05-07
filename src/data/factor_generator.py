@@ -14,6 +14,22 @@ from typing import Literal, Optional
 
 NodeType = Literal["ts", "cs", "scalar", "field"]
 
+# Internal op name → Qlib CamelCase name used in D.features() expressions
+QLIB_OP_NAME: dict[str, str] = {
+    "ts_mean": "Mean",
+    "ts_std":  "Std",
+    "ts_max":  "Max",
+    "ts_min":  "Min",
+    "ts_rank": "Rank",
+    "delta":   "Delta",
+    "add":     "Add",
+    "sub":     "Sub",
+    "mul":     "Mul",
+    "div":     "Div",
+    "log":     "Log",
+    "abs":     "Abs",
+}
+
 
 @dataclass
 class OperatorSpec:
@@ -32,8 +48,6 @@ OPERATORS: dict[str, OperatorSpec] = {
     "ts_min":  OperatorSpec("ts_min",  1, "ts", ["ts"], needs_window=True),
     "ts_rank": OperatorSpec("ts_rank", 1, "ts", ["ts"], needs_window=True),
     "delta":   OperatorSpec("delta",   1, "ts", ["ts"], needs_window=True),
-    "rank":    OperatorSpec("rank",    1, "cs", ["ts"]),
-    "zscore":  OperatorSpec("zscore",  1, "cs", ["ts"]),
     "add":     OperatorSpec("add",     2, "ts", ["ts", "ts"]),
     "sub":     OperatorSpec("sub",     2, "ts", ["ts", "ts"]),
     "mul":     OperatorSpec("mul",     2, "ts", ["ts", "ts"]),
@@ -60,8 +74,8 @@ class FactorExpression:
         args = [c.to_qlib_str() for c in self.children]
         if self.window is not None:
             args.append(str(self.window))
-        # Qlib uses CamelCase, e.g. Mean, Std, Rank — adjust mapping if needed.
-        return f"{self.op}({', '.join(args)})"
+        qlib_name = QLIB_OP_NAME.get(self.op, self.op)
+        return f"{qlib_name}({', '.join(args)})"
 
     def depth(self) -> int:
         if not self.children:
