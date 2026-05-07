@@ -51,7 +51,8 @@ def compute_ic_series(
     instruments = D.instruments(market=market)
 
     # Forward return label expression: future {h}-day return.
-    # Qlib syntax: Ref($close, -h) / $close - 1
+    # Qlib sign convention: positive offset = look BACK, negative = look FORWARD.
+    # So Ref($close, -h) / $close - 1 gives the h-day forward return.
     label_expr = f"Ref($close, -{forward_horizon_days}) / $close - 1"
 
     fields = list(factor_expressions.values()) + [label_expr]
