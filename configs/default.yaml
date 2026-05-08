@@ -9,8 +9,8 @@ data:
   qlib_provider_uri: "~/.qlib/qlib_data/cn_data"
 
 factor_pool:
-  use_alpha158: false
-  use_synthetic: true
+  use_alpha158: true
+  use_synthetic: false
   use_academic: false
 
   synthetic:

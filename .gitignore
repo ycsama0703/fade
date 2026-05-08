@@ -35,6 +35,11 @@ outputs/
 results/
 *.log
 
+# Synthetic-data backups (kept locally only)
+data_synthetic_backup/
+outputs_synthetic_backup/
+models/checkpoints_synthetic_backup/
+
 # IDE
 .vscode/
 .idea/
