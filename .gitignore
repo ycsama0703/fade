@@ -40,6 +40,10 @@ data_synthetic_backup/
 outputs_synthetic_backup/
 models/checkpoints_synthetic_backup/
 
+# Cross-market alternative data
+data_csi300/
+models/checkpoints_csi300/
+
 # IDE
 .vscode/
 .idea/

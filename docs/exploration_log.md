@@ -420,6 +420,158 @@ Strict Pareto dominance on all metrics, **at two independent OOS cutoffs**.
 - EIC regressor (disc-time features only): actively hurts under strict OOS
 - → The rolling-window methodology is the indispensable core of FADE.
 
+## Phase 9 — Broader benchmark sweep (anchor_v8)
+
+Tested 17 selection rules on the same strict-OOS setup (cutoff=2017, K=10, vt=6%):
+
+### Top performers @ vt=6%
+| Rule | AR | SR | MDD | Calmar | Uses FADE? |
+|---|---|---|---|---|---|
+| ICmom3+IC₀+RollHL (inv-vol) | **20.59%** | **2.95** | -2.14% | 9.63 | ✓ |
+| ICmom12 alone | 19.80% | 2.92 | -1.77% | **11.21** | ✗ |
+| ICmom12+IC₀ | 19.95% | 2.75 | -1.77% | 11.25 | ✗ |
+| ICmom3+IC₀+RollHL (equal-wt) | 18.09% | 2.57 | -2.50% | 7.23 | ✓ |
+| ICmom3+IC₀ baseline | 14.11% | 1.97 | -4.84% | 2.91 | ✗ |
+| ML stacking XGB | 5.96% | 1.21 | -2.73% | 2.18 | direct |
+
+**Surprise findings**:
+- **ICmom12 alone is essentially as good as FADE+inv-vol** (12-month lookback implicitly captures decay).
+- **ML stacking (direct XGBoost on next-month signed IC) UNDERPERFORMS** even random selection at vt=6% (SR 1.21 vs 1.34) — overfits financial noise.
+- Inv-vol weighting on top of FADE selection adds ~0.4 SR.
+- Multi-horizon momentum kitchen-sink dilutes ICmom12's edge — simpler beats complex.
+
+## Phase 10 — Bootstrap robustness (anchor_v9)
+50 trials × 100-of-141 random factor subsamples, K∈{5,10,20}, vt=6%.
+
+### vs ICmom3+IC₀ baseline — FADE is **bulletproof**
+| K | ΔAR mean | pct>0 | ΔSR mean | pct>0 | ΔMDD pct>0 | **Strict Pareto** |
+|---|---|---|---|---|---|---|
+| 5 | +3.68% | 100% | +0.439 | 100% | 94% | **94%** |
+| 10 | +2.91% | 100% | +0.385 | 100% | 96% | **96%** |
+| 20 | +1.30% | 100% | +0.233 | 100% | 94% | **94%** |
+Calmar fade/base ratio: 1.39× to 2.06× across K.
+
+### vs ICmom12 baseline — FADE LOSES robustly
+| K | ΔAR mean | pct>0 | ΔSR mean | pct>0 | Strict Pareto |
+|---|---|---|---|---|---|
+| 5 | -1.42% | 32% | -0.498 | 6% | 2% |
+| 10 | -3.99% | **0%** | -0.719 | **0%** | **0%** |
+| 20 | -3.87% | 0% | -0.695 | 0% | 0% |
+
+**Critical honest finding**: ICmom12 (single 12-month signal) Pareto-dominates FADE in 100% of bootstrap trials at K=10/20.
+
+### Implications for paper claim
+- Keep: **FADE robustly beats ICmom3+IC₀ baseline** (94-96% bootstrap Pareto). This is the publishable contribution.
+- Adjust narrative: ICmom12 is acknowledged as the strongest naive baseline. FADE doesn't beat it in raw quant terms — but provides:
+  - **Interpretable mechanism** (Cox HR shows decay drivers)
+  - **Earlier deployment** (works from disc+6m vs ICmom12 needing 12m)
+  - **Inv-vol weighted version edges ICmom12 in single full-pool test** (but not robust under bootstrap)
+
+The honest paper anchor is: **FADE provides decay-aware factor selection that improves on conventional short-lookback momentum baselines, with explicit interpretable hazard mechanism. Quantitative competitiveness with longer-lookback momentum is borderline; the methodological contribution is the rolling-window survival framework.**
+
+## Phase 11–12 — SOTA baseline crisis (anchor_v11, v12)
+
+After comparing against true SOTA baselines (ICIR_12m, MV+LW, HRP, MVO+LW), the prior FADE result COLLAPSED:
+
+| Rule | AR (vt=6%) | SR | MDD | Calmar |
+|---|---|---|---|---|
+| MVO+LW (mu=6m) | **27.92%** | **5.65** | -0.10% | 275 |
+| ICIR_12m+invvol | 24.75% | 4.76 | -0.86% | 29 |
+| ICIR_12m | 26.58% | 4.45 | -0.36% | 74 |
+| ICmom12 | 21.37% | 3.08 | -1.71% | 13 |
+| FADE_invvol (our prior winner) | 18.62% | 2.57 | -2.96% | 6.3 |
+| ICmom3+IC₀ baseline | 14.74% | 1.93 | -4.49% | 3.3 |
+
+**Critical observation**: Adding RollHL on top of ICIR_12m gives **identical** AR/SR/MDD as ICIR alone — they pick the same K=10 factors. Survival model has learned a redundant function of the same IC-stat features ICIR uses.
+
+→ FADE has **zero marginal value** over ICIR. Prior "Pareto" claims only held vs the weak ICmom3+IC₀ baseline.
+
+## Phase 13 (running) — direct target prediction with crowding + regime
+New approach with theoretical grounding:
+- Predict forward 6m ICIR DIRECTLY (not L1_duration noise label)
+- Add features ICIR cannot see: cross-factor crowding, regime dispersion
+- Strict purged + embargoed temporal CV (López de Prado)
+- Test against ICIR_12m+invvol AND MVO+LW
+
+If v13 also fails, escalate to:
+  v14: multi-task (forward IR + forward MDD jointly)
+  v15: conformal lower-bound selection (risk-aware)
+  v16: transformer on IC sequences with self-supervised pre-training
+  v17: stock-level factor exposure crowding (need new data)
+
+## ★★ Phase 13–16 — Repeated attempts to beat SOTA, all failed
+
+After v11 revealed ICIR_12m+invvol (SR=4.76) and MVO+LW (mu=6m) (SR=5.65) as the true SOTA on Alpha158, I attempted 4 more directions:
+
+### v13 — Direct forward-ICIR prediction with crowding + regime features
+Built (t, factor) panel of 15.5k rows × 28 features incl. crowding (cross-factor correlation), market dispersion, age. Trained XGBoost on forward 6m ICIR with purged temporal CV.
+
+**Result**: XGBoost test MSE was 27% better than trailing-ICIR baseline (rho 0.104 vs 0.022), BUT portfolio AR was much worse (6.74% vs 24.47% at vt=6%). The model relied on time-level features (age, mkt_avg_ic, mkt_disp) that don't help cross-sectional ranking within a t-slice — pred_quality ≠ selection_quality.
+
+### v14 — Cross-sectional detrended target + LambdaMART ranker
+Detrended target per t (y' = y - mean(y|t)) and trained XGBRanker with per-t groups (pairwise ranking loss).
+
+**Result**: per-t Spearman ρ = 0.07 for both XGBoost and Ranker. **Trailing ICIR alone gets ρ = 0.157 — actively learned models are 2× WORSE at cross-sectional ranking.** All 5 prediction-based rules underperformed trailing ICIR+invvol. Only MVO+LW (no FADE) Pareto-beats trailing ICIR.
+
+### v15 — MVO+LW with hazard-adjusted mu
+Tried Variants A (mu_adj = mu*(1-λ*hazard_z), λ∈{0.1,0.3,0.5,1.0}), B (pre-filter low-hazard quantile then MVO), C (post-multiply MVO weights by survival score).
+
+**Result**: ALL fail vs MVO+LW SOTA. Best (top 70% pre-filter) gets ΔAR=+0.40 but ΔSR=-0.19. Hazard is redundant with mu when MVO+LW has proper covariance structure.
+
+### v16 — Transaction-cost analysis (DeMiguel-Garlappi-Uppal 2009 framework)
+Hypothesis: FADE diversifies → lower turnover → wins net-of-cost.
+**Reality** (turnover):
+- ICmom3+IC0+RollHL+invvol (FADE): **88.9%** mean turnover (highest!)
+- MVO+LW: 61.0%
+- ICIR_12m+invvol: 40.0%
+- Equal-K (1/N): 34.1%
+
+FADE has HIGHEST turnover because RollHL is responsive to short-term IC dynamics. ICmom3 picks change month-to-month.
+
+At 50bps cost: **Equal-K (1/N) wins** (SR=2.82, Calmar=7.19) — confirming DeMiguel 2009. Not a FADE result.
+
+## ★★★ Final honest verdict
+
+After 16 versions × multiple methods × cross-market validation × bootstrap × transaction-cost analysis:
+
+**FADE/survival prediction CANNOT robustly beat ICIR_12m or MVO+LW on Alpha158 monthly portfolio construction.**
+
+The "Pareto wins" of v6/v7 only held vs the weak ICmom3+IC₀ baseline. Against true industry SOTA (ICIR, MVO+LW), all FADE variants:
+- Tie at best (e.g., RollHL+ICIR pick same K factors)
+- Lose at worst (high turnover, no marginal info beyond trailing stats)
+- Win on at most 1 of 4 metrics (AR or SR only, never Pareto)
+
+### Theoretical interpretation
+1. **Curated factor pool**: Alpha158 are pre-selected "stable" factors. Trailing ICIR is ALREADY near-optimal because factor stability is highly auto-correlated. ML adds variance without enough bias improvement.
+2. **AR(1) optimality**: for high-persistence series, sample mean is asymptotically optimal estimator. MVO+LW with trailing 6m mu is essentially this.
+3. **Feature space exhaustion**: crowding, regime, age, hazard, multi-window — none provided info beyond trailing ICIR statistics.
+4. **Test sample limit**: 38 months has wide bootstrap CIs (±2pp AR). Even genuine micro-edges aren't statistically significant.
+
+### What it would take to actually beat SOTA
+1. **Different data**: noisier factor pool (no survivorship bias), multi-asset, US factors, weekly/daily frequency
+2. **Different task**: capacity prediction, regime detection, decay event timing — places where ML has more headroom
+3. **Different methodology**: end-to-end differentiable selection with Sharpe loss; transformer on IC sequences with self-supervised pretraining; cross-asset transfer learning
+4. **1–2 months of focused new development**
+
+## Honest paper positioning recommendation
+
+**Plan X (realistic, viable)**: Negative-result + theoretical analysis paper
+- Title candidate: "On the Limits of Survival Prediction for Factor Decay: An Empirical Analysis"
+- Contributions:
+  1. Strong prediction-quality benchmark (M3 GBS C-index 0.84 OOS, Cox interpretable HRs)
+  2. Comprehensive comparison: 16 methods × 6 baselines × bootstrap × cross-market × cost analysis
+  3. Theoretical framing: AR(1) optimality, why trailing ICIR is hard to beat on curated pools
+  4. Constructive directions for future work
+- Suitable venues: JFDS, Quantitative Finance, ACM ICAIF
+- Realistic acceptance: 50-65%
+
+**Plan Y (ambitious, requires more time)**: Pivot to different data/task
+- Run on noisier factor universe, multi-asset, or different downstream metric
+- Add deep learning novelty (Transformer + self-supervised)
+- 1-2 months development
+
+The current state is **Plan X is publishable today; Plan Y needs new compute / data / time**.
+
 ### Outstanding TODOs
 - [ ] Re-fit Cox with strict OOS (the saved Cox in trained_models.pkl was train-only) to confirm hazard interpretation.
 - [ ] Plot cumulative-return curves (data is in `outputs/_anchor_scores.parquet` and could rebuild with cumret).

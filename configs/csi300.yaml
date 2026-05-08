@@ -1,0 +1,92 @@
+seed: 42
+data:
+  market: csi300
+  start_date: '2010-01-01'
+  end_date: '2024-12-31'
+  qlib_provider_uri: ~/.qlib/qlib_data/cn_data
+factor_pool:
+  use_alpha158: true
+  use_synthetic: false
+  use_academic: false
+  synthetic:
+    n_candidates: 1000
+    max_tree_depth: 4
+    operators_ts:
+    - ts_mean
+    - ts_std
+    - ts_max
+    - ts_min
+    - ts_rank
+    - delta
+    operators_cs: []
+    operators_arith:
+    - add
+    - sub
+    - mul
+    - div
+    - log
+    - abs
+    lookback_windows:
+    - 5
+    - 10
+    - 20
+    - 60
+    base_fields:
+    - open
+    - high
+    - low
+    - close
+    - volume
+    - vwap
+    discovery_date_start: '2010-06-01'
+    discovery_date_end: '2018-12-31'
+  filter:
+    min_initial_abs_ic: 0.01
+    initial_window_months: 12
+backtest:
+  ic_frequency: monthly
+  forward_return_horizon_days: 20
+  max_tracking_months: 60
+labels:
+  half_life:
+    initial_window_months: 6
+    persist_months: 6
+    min_abs_ic0: 0.005
+  binary_horizons:
+  - 24
+  - 36
+features:
+  early_ic_windows:
+  - 3
+  - 6
+  - 12
+  market_env:
+    volatility_window_days: 60
+    regime_n_states: 3
+split:
+  train_start: '2010-01-01'
+  train_end: '2018-12-31'
+  val_start: '2019-01-01'
+  val_end: '2020-12-31'
+  test_start: '2021-01-01'
+  test_end: '2024-12-31'
+models:
+  cox:
+    penalizer: 0.1
+    l1_ratio: 0.0
+  xgboost:
+    n_estimators: 500
+    max_depth: 5
+    learning_rate: 0.05
+    subsample: 0.8
+  lstm:
+    hidden_dim: 64
+    num_layers: 2
+    dropout: 0.2
+    epochs: 50
+    batch_size: 32
+paths:
+  data_dir: data_csi300
+  model_dir: models/checkpoints_csi300
+  output_dir: outputs
+  log_dir: logs
